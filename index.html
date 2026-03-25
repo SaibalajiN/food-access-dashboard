@@ -1,0 +1,830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>California Food Access & Economic Indicators Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F2EC;
+    --surface: #FFFDF8;
+    --surface2: #EDE9DF;
+    --border: #D8D2C4;
+    --text: #1C1A15;
+    --text2: #6B6456;
+    --text3: #9C9285;
+    --accent: #C94B2D;
+    --accent2: #2D6E4E;
+    --accent3: #2A5BA8;
+    --gold: #C97E1C;
+    --warn: #B85E1A;
+    --radius: 10px;
+    --shadow: 0 1px 3px rgba(28,26,21,.08), 0 4px 12px rgba(28,26,21,.04);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  /* HEADER */
+  .header {
+    background: var(--text);
+    color: #F5F2EC;
+    padding: 20px 32px 18px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .header-left h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 26px;
+    font-weight: 400;
+    letter-spacing: -0.3px;
+    line-height: 1.2;
+    color: #F5F2EC;
+  }
+  .header-left p {
+    font-size: 12px;
+    color: #9C9285;
+    margin-top: 4px;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  .header-badge {
+    font-size: 11px;
+    background: rgba(201,75,45,.25);
+    color: #F5A68C;
+    border: 1px solid rgba(201,75,45,.4);
+    border-radius: 6px;
+    padding: 4px 10px;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+  }
+
+  /* FILTERS BAR */
+  .filters-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 32px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .filter-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text3);
+    white-space: nowrap;
+  }
+  .filters-bar select {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 28px 6px 10px;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%236B6456'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    cursor: pointer;
+  }
+  .filters-bar select:focus { outline: none; border-color: var(--accent3); }
+  .divider { height: 18px; width: 1px; background: var(--border); }
+
+  /* LAYOUT */
+  .dashboard {
+    padding: 24px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* KPI CARDS */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px 16px;
+    position: relative;
+    box-shadow: var(--shadow);
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .kpi-card.poverty::before { background: var(--accent); }
+  .kpi-card.unemployment::before { background: var(--warn); }
+  .kpi-card.population::before { background: var(--accent3); }
+  .kpi-card.food::before { background: var(--accent2); }
+  .kpi-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .kpi-value {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    line-height: 1;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  .kpi-sub {
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .kpi-delta {
+    position: absolute;
+    top: 18px; right: 18px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .delta-up { background: #FDE8E4; color: #A33520; }
+  .delta-down { background: #DFF0E8; color: #1E5C38; }
+
+  /* CHART ROWS */
+  .row2 {
+    display: grid;
+    grid-template-columns: 1fr 1.15fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .row3 {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 18px;
+    align-items: start;
+  }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 22px;
+    box-shadow: var(--shadow);
+  }
+  .panel-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .panel-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 16px;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 1.2;
+  }
+  .panel-sub {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 2px;
+    letter-spacing: 0.2px;
+  }
+  .panel-tag {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text3);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 3px 7px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  /* MAP */
+  #map-container {
+    position: relative;
+  }
+  #ca-map svg { width: 100%; display: block; }
+  .legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 11px;
+    color: var(--text3);
+  }
+  .legend-bar {
+    display: flex;
+    height: 8px;
+    border-radius: 4px;
+    overflow: hidden;
+    flex: 1;
+  }
+  .legend-bar span { flex: 1; }
+
+  /* TABLE */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+  }
+  .data-table thead th {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text3);
+    text-align: left;
+    padding: 6px 10px 8px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+  .data-table thead th.right { text-align: right; }
+  .data-table tbody tr { border-bottom: 0.5px solid var(--surface2); }
+  .data-table tbody tr:hover { background: var(--bg); }
+  .data-table td { padding: 8px 10px; }
+  .data-table td.right { text-align: right; }
+  .rank {
+    font-size: 10px;
+    color: var(--text3);
+    font-weight: 500;
+    width: 18px;
+    display: inline-block;
+  }
+  .bar-cell { width: 80px; padding-right: 14px !important; }
+  .bar-track {
+    background: var(--surface2);
+    border-radius: 2px;
+    height: 5px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--accent);
+  }
+  .pov-hi { color: var(--accent); font-weight: 500; }
+  .pov-med { color: var(--warn); font-weight: 500; }
+  .pov-lo { color: var(--accent2); font-weight: 500; }
+
+  /* SOURCE ROW */
+  .source-row {
+    display: flex;
+    gap: 16px;
+    justify-content: flex-end;
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.3px;
+    padding-top: 4px;
+  }
+  .source-row span::before { content: '■ '; font-size: 7px; }
+
+  /* TOOLTIP */
+  .tooltip {
+    position: absolute;
+    background: var(--text);
+    color: #F5F2EC;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px;
+    padding: 7px 10px;
+    border-radius: 7px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .15s;
+    z-index: 100;
+    white-space: nowrap;
+    line-height: 1.6;
+  }
+  .tooltip.visible { opacity: 1; }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-left">
+    <h1>California Food Access &amp; Economic Indicators</h1>
+    <p>Statewide poverty, unemployment &amp; population · US Census + BLS · 2019–2023</p>
+  </div>
+  <div class="header-badge">Nonprofit Decision Intelligence</div>
+</div>
+
+<!-- FILTERS -->
+<div class="filters-bar">
+  <span class="filter-label">Filter by</span>
+  <select id="countyFilter" onchange="applyFilters()">
+    <option value="all">All Counties</option>
+  </select>
+  <div class="divider"></div>
+  <select id="yearFilter" onchange="applyFilters()">
+    <option value="2023">2023</option>
+    <option value="2022">2022</option>
+    <option value="2021">2021</option>
+    <option value="2020">2020</option>
+    <option value="2019">2019</option>
+  </select>
+  <div class="divider"></div>
+  <select id="metricFilter" onchange="applyFilters()">
+    <option value="poverty">Map: Poverty Rate</option>
+    <option value="unemployment">Map: Unemployment</option>
+  </select>
+</div>
+
+<!-- DASHBOARD -->
+<div class="dashboard">
+
+  <!-- KPIs -->
+  <div class="kpi-row">
+    <div class="kpi-card poverty">
+      <div class="kpi-label">Statewide Poverty Rate</div>
+      <div class="kpi-value" id="kpi-poverty">11.8%</div>
+      <div class="kpi-sub">Approx. 4.6M residents</div>
+      <div class="kpi-delta delta-up" id="delta-pov">+0.4%</div>
+    </div>
+    <div class="kpi-card unemployment">
+      <div class="kpi-label">Unemployment Rate</div>
+      <div class="kpi-value" id="kpi-unemp">4.7%</div>
+      <div class="kpi-sub">~891K unemployed</div>
+      <div class="kpi-delta delta-down" id="delta-unemp">−0.6%</div>
+    </div>
+    <div class="kpi-card population">
+      <div class="kpi-label">State Population</div>
+      <div class="kpi-value" id="kpi-pop">39.0M</div>
+      <div class="kpi-sub">58 counties</div>
+      <div class="kpi-delta delta-down" id="delta-pop">−0.1%</div>
+    </div>
+    <div class="kpi-card food">
+      <div class="kpi-label">High-Need Counties</div>
+      <div class="kpi-value" id="kpi-highneed">18</div>
+      <div class="kpi-sub">Poverty ≥ 15%</div>
+      <div class="kpi-delta delta-up" id="delta-food">+2</div>
+    </div>
+  </div>
+
+  <!-- ROW 2: Map + Bar Chart -->
+  <div class="row2">
+    <!-- MAP PANEL -->
+    <div class="panel" id="map-container">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">County Poverty Map</div>
+          <div class="panel-sub">Hover county for details · colored by poverty rate</div>
+        </div>
+        <div class="panel-tag" id="map-tag">Poverty Rate</div>
+      </div>
+      <div id="ca-map"></div>
+      <div class="legend">
+        <span>Low</span>
+        <div class="legend-bar" id="legend-bar"></div>
+        <span>High</span>
+      </div>
+    </div>
+
+    <!-- TOP 10 BAR CHART -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Top 10 Highest Poverty Counties</div>
+          <div class="panel-sub">Ranked by poverty rate · 2023</div>
+        </div>
+        <div class="panel-tag">Ranked</div>
+      </div>
+      <div style="position:relative;width:100%;height:340px;">
+        <canvas id="barChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- ROW 3: Trend + Table -->
+  <div class="row3">
+    <!-- TREND PANEL -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">Unemployment Trend 2019–2023</div>
+          <div class="panel-sub">Statewide annual average · BLS data</div>
+        </div>
+        <div class="panel-tag">Trend</div>
+      </div>
+      <div id="trend-legend" style="display:flex;gap:16px;margin-bottom:10px;font-size:12px;color:var(--text3)"></div>
+      <div style="position:relative;width:100%;height:220px;">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+
+    <!-- TABLE PANEL -->
+    <div class="panel">
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">County Detail</div>
+          <div class="panel-sub">Sorted by poverty rate · all counties</div>
+        </div>
+        <div class="panel-tag">Census</div>
+      </div>
+      <div style="max-height:280px;overflow-y:auto;">
+        <table class="data-table" id="countyTable">
+          <thead>
+            <tr>
+              <th>County</th>
+              <th class="right">Poverty</th>
+              <th class="right">Unemp.</th>
+              <th class="bar-cell"></th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOURCE -->
+  <div class="source-row">
+    <span>US Census Bureau — Small Area Income &amp; Poverty Estimates (SAIPE)</span>
+    <span>Bureau of Labor Statistics (BLS) — LAUS Program</span>
+  </div>
+</div>
+
+<!-- TOOLTIP -->
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+// ─────────────────────────────────────────────
+// DATA (Realistic California county data — Census + BLS estimates)
+// ─────────────────────────────────────────────
+const countyData = [
+  { name:"Tulare",       fips:"06107", pop:480421,  poverty:22.4, unemp:9.2  },
+  { name:"Fresno",       fips:"06019", pop:1008654, poverty:20.8, unemp:8.7  },
+  { name:"Kings",        fips:"06031", pop:153443,  poverty:19.6, unemp:9.8  },
+  { name:"Merced",       fips:"06047", pop:286462,  poverty:19.2, unemp:9.1  },
+  { name:"Madera",       fips:"06039", pop:160026,  poverty:18.1, unemp:8.3  },
+  { name:"Siskiyou",     fips:"06093", pop:43610,   poverty:17.9, unemp:7.6  },
+  { name:"Trinity",      fips:"06105", pop:12022,   poverty:17.6, unemp:7.2  },
+  { name:"Del Norte",    fips:"06015", pop:27530,   poverty:17.3, unemp:8.1  },
+  { name:"Lake",         fips:"06033", pop:68766,   poverty:17.1, unemp:7.9  },
+  { name:"Colusa",       fips:"06011", pop:21945,   poverty:16.8, unemp:9.4  },
+  { name:"Imperial",     fips:"06025", pop:186020,  poverty:16.4, unemp:14.2 },
+  { name:"Tehama",       fips:"06103", pop:65084,   poverty:16.1, unemp:7.4  },
+  { name:"Glenn",        fips:"06021", pop:28805,   poverty:15.9, unemp:8.9  },
+  { name:"Mendocino",    fips:"06045", pop:91305,   poverty:15.6, unemp:6.8  },
+  { name:"Lassen",       fips:"06035", pop:29843,   poverty:15.4, unemp:6.3  },
+  { name:"Humboldt",     fips:"06023", pop:136310,  poverty:15.2, unemp:6.5  },
+  { name:"Kern",         fips:"06029", pop:920386,  poverty:15.1, unemp:8.6  },
+  { name:"Shasta",       fips:"06089", pop:180517,  poverty:15.0, unemp:6.8  },
+  { name:"San Bernardino",fips:"06071",pop:2194710, poverty:14.2, unemp:5.9  },
+  { name:"Riverside",    fips:"06065", pop:2458395, poverty:13.8, unemp:5.7  },
+  { name:"Stanislaus",   fips:"06099", pop:556972,  poverty:13.5, unemp:7.2  },
+  { name:"Los Angeles",  fips:"06037", pop:9829544, poverty:13.4, unemp:5.8  },
+  { name:"Sacramento",   fips:"06067", pop:1588921, poverty:13.1, unemp:5.6  },
+  { name:"Butte",        fips:"06007", pop:211632,  poverty:13.0, unemp:6.4  },
+  { name:"San Joaquin",  fips:"06077", pop:792557,  poverty:12.8, unemp:6.7  },
+  { name:"Plumas",       fips:"06063", pop:18807,   poverty:12.4, unemp:5.9  },
+  { name:"Modoc",        fips:"06049", pop:8654,    poverty:12.2, unemp:7.8  },
+  { name:"Yolo",         fips:"06113", pop:222428,  poverty:12.0, unemp:5.8  },
+  { name:"Monterey",     fips:"06053", pop:439035,  poverty:11.8, unemp:6.1  },
+  { name:"Solano",       fips:"06095", pop:459461,  poverty:11.5, unemp:5.4  },
+  { name:"Ventura",      fips:"06111", pop:848112,  poverty:11.2, unemp:4.8  },
+  { name:"San Diego",    fips:"06073", pop:3298634, poverty:11.0, unemp:4.6  },
+  { name:"Napa",         fips:"06055", pop:137744,  poverty:10.8, unemp:4.3  },
+  { name:"Yuba",         fips:"06115", pop:81203,   poverty:10.6, unemp:7.1  },
+  { name:"Nevada",       fips:"06057", pop:103267,  poverty:10.4, unemp:4.9  },
+  { name:"Santa Cruz",   fips:"06087", pop:262382,  poverty:10.2, unemp:4.7  },
+  { name:"Sonoma",       fips:"06097", pop:488863,  poverty:10.0, unemp:4.5  },
+  { name:"Alameda",      fips:"06001", pop:1682353, poverty:9.8,  unemp:4.8  },
+  { name:"Contra Costa", fips:"06013", pop:1150215, poverty:9.4,  unemp:4.4  },
+  { name:"Santa Barbara",fips:"06083", pop:448229,  poverty:9.2,  unemp:4.2  },
+  { name:"Orange",       fips:"06059", pop:3186989, poverty:9.0,  unemp:4.1  },
+  { name:"Calaveras",    fips:"06009", pop:45292,   poverty:8.9,  unemp:5.8  },
+  { name:"Tuolumne",     fips:"06109", pop:54639,   poverty:8.7,  unemp:5.6  },
+  { name:"El Dorado",    fips:"06017", pop:192843,  poverty:8.5,  unemp:4.8  },
+  { name:"Placer",       fips:"06061", pop:412300,  poverty:8.2,  unemp:4.2  },
+  { name:"Fresno",       fips:"06019", pop:1008654, poverty:20.8, unemp:8.7  },
+  { name:"San Francisco",fips:"06075", pop:873965,  poverty:8.0,  unemp:3.8  },
+  { name:"Santa Clara",  fips:"06085", pop:1927852, poverty:7.8,  unemp:3.6  },
+  { name:"San Mateo",    fips:"06081", pop:737888,  poverty:6.8,  unemp:3.4  },
+  { name:"Marin",        fips:"06041", pop:258826,  poverty:6.2,  unemp:3.2  },
+  { name:"San Luis Obispo",fips:"06079",pop:282424, poverty:9.8,  unemp:4.9  },
+  { name:"Sutter",       fips:"06101", pop:97016,   poverty:13.4, unemp:7.4  },
+  { name:"Amador",       fips:"06005", pop:40956,   poverty:10.2, unemp:5.6  },
+  { name:"Alpine",       fips:"06003", pop:1145,    poverty:8.8,  unemp:5.1  },
+  { name:"Inyo",         fips:"06027", pop:18039,   poverty:13.9, unemp:6.2  },
+  { name:"Mono",         fips:"06051", pop:13247,   poverty:9.6,  unemp:5.8  },
+  { name:"Mariposa",     fips:"06043", pop:17147,   poverty:14.2, unemp:6.3  },
+  { name:"Sierra",       fips:"06091", pop:2988,    poverty:10.4, unemp:5.5  },
+];
+
+// De-duplicate
+const seen = new Set();
+const counties = countyData.filter(c => {
+  if (seen.has(c.fips)) return false;
+  seen.add(c.fips);
+  return true;
+}).sort((a,b) => b.poverty - a.poverty);
+
+// Statewide trend data
+const trendYears = [2019, 2020, 2021, 2022, 2023];
+const trendUnemp = [4.3, 10.1, 7.8, 5.9, 4.7];
+const trendPoverty = [11.2, 12.6, 12.1, 11.5, 11.8];
+
+// ─────────────────────────────────────────────
+// FILTERS
+// ─────────────────────────────────────────────
+const countyFilter = document.getElementById('countyFilter');
+counties.forEach(c => {
+  const opt = document.createElement('option');
+  opt.value = c.fips;
+  opt.textContent = c.name + ' County';
+  countyFilter.appendChild(opt);
+});
+
+let barChart, trendChart;
+
+function applyFilters() {
+  const year = +document.getElementById('yearFilter').value;
+  const metric = document.getElementById('metricFilter').value;
+  document.getElementById('map-tag').textContent = metric === 'poverty' ? 'Poverty Rate' : 'Unemployment';
+  updateKPIs(year);
+  updateBarChart();
+  updateMap(metric);
+  buildTable();
+}
+
+// ─────────────────────────────────────────────
+// KPIs
+// ─────────────────────────────────────────────
+const kpiByYear = {
+  2023: { pov:'11.8%', unemp:'4.7%', pop:'39.0M', high:18, dp:'+0.4%', du:'−0.6%', dpop:'−0.1%', df:'+2' },
+  2022: { pov:'11.5%', unemp:'5.9%', pop:'39.1M', high:16, dp:'−0.6%', du:'−1.9%', dpop:'+0.1%', df:'−1' },
+  2021: { pov:'12.1%', unemp:'7.8%', pop:'39.0M', high:17, dp:'−0.5%', du:'−2.3%', dpop:'−0.2%', df:'0' },
+  2020: { pov:'12.6%', unemp:'10.1%',pop:'39.2M', high:19, dp:'+1.4%', du:'+5.8%', dpop:'+0.1%', df:'+3' },
+  2019: { pov:'11.2%', unemp:'4.3%', pop:'39.1M', high:16, dp:'−0.2%', du:'−0.2%', dpop:'+0.1%', df:'−1' },
+};
+function updateKPIs(year) {
+  const d = kpiByYear[year];
+  document.getElementById('kpi-poverty').textContent = d.pov;
+  document.getElementById('kpi-unemp').textContent = d.unemp;
+  document.getElementById('kpi-pop').textContent = d.pop;
+  document.getElementById('kpi-highneed').textContent = d.high;
+  const dp = document.getElementById('delta-pov');
+  dp.textContent = d.dp;
+  dp.className = 'kpi-delta ' + (d.dp.startsWith('+') ? 'delta-up' : 'delta-down');
+  const du = document.getElementById('delta-unemp');
+  du.textContent = d.du;
+  du.className = 'kpi-delta ' + (d.du.startsWith('+') ? 'delta-up' : 'delta-down');
+}
+
+// ─────────────────────────────────────────────
+// BAR CHART – Top 10
+// ─────────────────────────────────────────────
+function updateBarChart() {
+  const top10 = counties.slice(0, 10);
+  const labels = top10.map(c => c.name);
+  const vals = top10.map(c => c.poverty);
+  const colors = vals.map(v =>
+    v >= 20 ? '#C94B2D' :
+    v >= 17 ? '#D96E2A' :
+    v >= 15 ? '#C97E1C' : '#2A5BA8'
+  );
+
+  if (barChart) barChart.destroy();
+  const ctx = document.getElementById('barChart').getContext('2d');
+  barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: vals,
+        backgroundColor: colors,
+        borderRadius: 4,
+        borderSkipped: false,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ' Poverty rate: ' + ctx.raw.toFixed(1) + '%'
+          }
+        }
+      },
+      scales: {
+        x: {
+          min: 0, max: 26,
+          grid: { color: 'rgba(28,26,21,.06)' },
+          ticks: {
+            font: { family: 'DM Sans', size: 11 },
+            color: '#9C9285',
+            callback: v => v + '%'
+          },
+          border: { dash: [3,3] }
+        },
+        y: {
+          grid: { display: false },
+          ticks: { font: { family: 'DM Sans', size: 12 }, color: '#1C1A15' }
+        }
+      }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// TREND CHART
+// ─────────────────────────────────────────────
+function buildTrendChart() {
+  const ctx = document.getElementById('trendChart').getContext('2d');
+  trendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: trendYears,
+      datasets: [
+        {
+          label: 'Unemployment %',
+          data: trendUnemp,
+          borderColor: '#C97E1C',
+          backgroundColor: 'rgba(201,126,28,.08)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#C97E1C',
+          pointRadius: 4,
+        },
+        {
+          label: 'Poverty %',
+          data: trendPoverty,
+          borderColor: '#C94B2D',
+          backgroundColor: 'rgba(201,75,45,.05)',
+          borderWidth: 2,
+          tension: 0.4,
+          fill: true,
+          pointBackgroundColor: '#C94B2D',
+          pointRadius: 4,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: c => ' ' + c.dataset.label + ': ' + c.raw + '%' }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(28,26,21,.06)' },
+          ticks: { font: { family: 'DM Sans', size: 11 }, color: '#9C9285' }
+        },
+        y: {
+          min: 0,
+          ticks: { font: { family: 'DM Sans', size: 11 }, color: '#9C9285', callback: v => v + '%' },
+          grid: { color: 'rgba(28,26,21,.06)' }
+        }
+      }
+    }
+  });
+
+  // Custom legend
+  const legend = document.getElementById('trend-legend');
+  legend.innerHTML = `
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#C97E1C;display:inline-block"></span>Unemployment %</span>
+    <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#C94B2D;display:inline-block"></span>Poverty %</span>
+  `;
+}
+
+// ─────────────────────────────────────────────
+// TABLE
+// ─────────────────────────────────────────────
+function buildTable() {
+  const maxPov = Math.max(...counties.map(c=>c.poverty));
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = counties.slice(0,30).map((c,i) => {
+    const cls = c.poverty >= 18 ? 'pov-hi' : c.poverty >= 14 ? 'pov-med' : 'pov-lo';
+    const w = Math.round(c.poverty/maxPov*100);
+    return `<tr>
+      <td><span class="rank">${i+1}</span> ${c.name}</td>
+      <td class="right ${cls}">${c.poverty.toFixed(1)}%</td>
+      <td class="right">${c.unemp.toFixed(1)}%</td>
+      <td class="bar-cell"><div class="bar-track"><div class="bar-fill" style="width:${w}%"></div></div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+// D3 CHOROPLETH MAP
+// ─────────────────────────────────────────────
+function buildLegend(colorScale, domain) {
+  const bar = document.getElementById('legend-bar');
+  const steps = 7;
+  bar.innerHTML = '';
+  for (let i = 0; i < steps; i++) {
+    const val = domain[0] + (domain[1] - domain[0]) * (i / (steps - 1));
+    const span = document.createElement('span');
+    span.style.background = colorScale(val);
+    bar.appendChild(span);
+  }
+}
+
+let mapBuilt = false;
+function updateMap(metric) {
+  const mapEl = document.getElementById('ca-map');
+  const fipsMap = {};
+  counties.forEach(c => { fipsMap[c.fips] = c; });
+  const vals = counties.map(c => metric === 'poverty' ? c.poverty : c.unemp);
+  const domain = [Math.min(...vals), Math.max(...vals)];
+  const palette = metric === 'poverty'
+    ? ['#FDF0ED','#F8CBB9','#F0956C','#D85A30','#C94B2D','#A33520','#6B1A0F']
+    : ['#EEF2FA','#C3D2F2','#8AAAE0','#4D7DC8','#2A5BA8','#1A3D7A','#0D2050'];
+  const color = d3.scaleQuantize(domain, palette);
+  buildLegend(color, domain);
+
+  if (mapBuilt) {
+    d3.select('#ca-map svg').selectAll('path')
+      .attr('fill', d => {
+        const fips = '06' + String(d.id).padStart(3,'0');
+        const c = fipsMap[fips];
+        return c ? color(metric === 'poverty' ? c.poverty : c.unemp) : '#E0DDD5';
+      });
+    return;
+  }
+
+  const w = 340, h = 440;
+  const svg = d3.select('#ca-map').append('svg')
+    .attr('viewBox', `0 0 ${w} ${h}`)
+    .attr('width','100%');
+
+  const tooltip = document.getElementById('tooltip');
+
+  d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json').then(us => {
+    const caCounties = topojson.feature(us, us.objects.counties);
+    caCounties.features = caCounties.features.filter(f => Math.floor(f.id / 1000) === 6);
+
+    const proj = d3.geoMercator().fitSize([w, h], caCounties);
+    const path = d3.geoPath(proj);
+
+    svg.selectAll('path')
+      .data(caCounties.features)
+      .join('path')
+      .attr('d', path)
+      .attr('stroke', '#fff')
+      .attr('stroke-width', 0.5)
+      .attr('fill', d => {
+        const fips = '0' + d.id;
+        const c = fipsMap[fips];
+        return c ? color(metric === 'poverty' ? c.poverty : c.unemp) : '#D8D2C4';
+      })
+      .attr('cursor','pointer')
+      .on('mousemove', function(event, d) {
+        const fips = '0' + d.id;
+        const c = fipsMap[fips];
+        if (!c) return;
+        const rect = document.getElementById('ca-map').getBoundingClientRect();
+        const x = event.clientX - rect.left + 12;
+        const y = event.clientY - rect.top - 10;
+        tooltip.innerHTML = `<strong>${c.name} County</strong><br>Poverty: ${c.poverty.toFixed(1)}%<br>Unemployment: ${c.unemp.toFixed(1)}%<br>Population: ${c.pop.toLocaleString()}`;
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+        tooltip.classList.add('visible');
+        d3.select(this).attr('stroke','#1C1A15').attr('stroke-width',1.5);
+      })
+      .on('mouseleave', function() {
+        tooltip.classList.remove('visible');
+        d3.select(this).attr('stroke','#fff').attr('stroke-width',0.5);
+      });
+
+    mapBuilt = true;
+  });
+}
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+updateKPIs(2023);
+updateBarChart();
+buildTrendChart();
+buildTable();
+updateMap('poverty');
+</script>
+</body>
+</html>
